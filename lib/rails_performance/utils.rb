@@ -45,9 +45,9 @@ module RailsPerformance
 
       return [] if keys.blank?
 
-      values = keys.in_groups_of(mget_batch_size).map{|key_batch|
+      values = keys.in_groups_of(mget_batch_size).map do |key_batch|
         RailsPerformance.redis.mget(key_batch.compact)
-      }.flatten
+      end.flatten
 
       RailsPerformance.log "\n\n   [FOUND]   -->   #{values.size}\n\n"
 
