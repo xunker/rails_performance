@@ -30,16 +30,17 @@ module RailsPerformance
         end
       end
 
+      # TODO: simplify this method, and combine with nullify_data
       def calculate_data
-        now = Time.current
-        stop = Time.at(60 * (now.to_i / 60))
-        offset = RailsPerformance::Reports::BaseReport.time_in_app_time_zone(now).utc_offset
+        now = RailsPerformance::Utils.time
+        now = now.change(sec: 0, usec: 0)
+        stop = now # Time.at(60 * (now.to_i / 60), in:)
+        offset = 0 # RailsPerformance::Reports::BaseReport.time_in_app_time_zone(now).utc_offset
         current = stop - RailsPerformance.duration
 
         @data = []
         all = {}
 
-        # read current values
         db.group_by(group).each do |(k, v)|
           yield(all, k, v)
         end
@@ -54,6 +55,39 @@ module RailsPerformance
 
         # sort by time
         @data.sort!
+      end
+
+      # Generate series for our time range -> (now - duration)..now
+      # {
+      #   1732125540000 => 0,
+      #   1732125550000 => 0,
+      #   ....
+      # }
+      def nil_data(duration = RailsPerformance.duration)
+        @nil_data ||= begin
+          result = {}
+          now = RailsPerformance::Utils.time
+          now = now.change(sec: 0, usec: 0)
+          stop = now # Time.at(60 * (now.to_i / 60))
+          offset = 0 # RailsPerformance::Reports::BaseReport.time_in_app_time_zone(now).utc_offset
+          current = stop - duration
+
+          while current <= stop
+            current.strftime(RailsPerformance::FORMAT)
+            result[(current.to_i + offset) * 1000] = nil
+            current += 1.minute
+          end
+
+          result
+        end
+      end
+
+      # {
+      #   1732125540000 => 1,
+      #   1732125550000 => 0,
+      # }
+      def nullify_data(input, duration = RailsPerformance.duration)
+        nil_data(duration).merge(input).sort
       end
     end
   end

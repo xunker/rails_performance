@@ -6,22 +6,25 @@ module RailsPerformance
       delayed_job: RailsPerformance::Models::DelayedJobRecord,
       grape: RailsPerformance::Models::GrapeRecord,
       rake: RailsPerformance::Models::RakeRecord,
-      custom: RailsPerformance::Models::CustomRecord
+      custom: RailsPerformance::Models::CustomRecord,
+      resources: RailsPerformance::Models::ResourceRecord
     }
 
-    attr_reader :q, :klass, :type
+    attr_reader :q, :klass, :type, :days
 
-    def initialize(type:, q: {})
+    def initialize(type:, q: {}, days: RailsPerformance::Utils.days(RailsPerformance.duration))
       @type = type
       @klass = KLASSES[type]
       q[:on] ||= Date.today
       @q = q
+      @days = days
     end
 
     def db
       result = RailsPerformance::Models::Collection.new
-      (0..(RailsPerformance::Utils.days + 1)).to_a.reverse_each do |e|
-        RailsPerformance::DataSource.new(q: q.merge({on: (Time.current - e.days).to_date}), type: type).add_to(result)
+      now = RailsPerformance::Utils.time
+      (0..days).to_a.reverse_each do |e|
+        RailsPerformance::DataSource.new(q: q.merge({on: (now - e.days).to_date}), type: type).add_to(result)
       end
       result
     end
@@ -53,6 +56,8 @@ module RailsPerformance
       case type
       when :requests
         "performance|*#{compile_requests_query}*|END|#{RailsPerformance::SCHEMA}"
+      when :resources
+        "resource|*#{compile_resource_query}*|END|#{RailsPerformance::SCHEMA}"
       when :sidekiq
         "sidekiq|*#{compile_sidekiq_query}*|END|#{RailsPerformance::SCHEMA}"
       when :delayed_job
@@ -64,7 +69,7 @@ module RailsPerformance
       when :custom
         "custom|*#{compile_custom_query}*|END|#{RailsPerformance::SCHEMA}"
       else
-        raise "wrong type for datasource query builder"
+        raise "wrong type: \"#{type}\" for datasource query builder"
       end
     end
 
@@ -86,6 +91,15 @@ module RailsPerformance
       str << "worker|#{q[:worker]}|" if q[:worker].present?
       str << "datetime|#{q[:on].strftime("%Y%m%d")}*|" if q[:on].present?
       str << "status|#{q[:status]}|" if q[:status].present?
+      str.join("*")
+    end
+
+    def compile_resource_query
+      str = []
+      str << "server|#{q[:server]}|" if q[:server].present?
+      str << "context|#{q[:context]}|" if q[:context].present?
+      str << "role|#{q[:role]}|" if q[:role].present?
+      str << "datetime|#{q[:on].strftime("%Y%m%d")}*|" if q[:on].present?
       str.join("*")
     end
 

@@ -1,5 +1,13 @@
 module RailsPerformance
   class Utils
+    def self.time
+      Time.now.utc
+    end
+
+    def self.from_datetimei(datetimei)
+      Time.at(datetimei, in: "+00:00")
+    end
+
     # date key in redis store
     def self.cache_key(now = Date.today)
       "date-#{now}"
@@ -7,7 +15,7 @@ module RailsPerformance
 
     # write to current slot
     # time - date -minute
-    def self.field_key(now = Time.current)
+    def self.field_key(now = RailsPerformance::Utils.time)
       now.strftime("%H:%M")
     end
 
@@ -63,8 +71,8 @@ module RailsPerformance
       RailsPerformance.redis.set(key, value.to_json, ex: expire.to_i)
     end
 
-    def self.days
-      (RailsPerformance.duration / 1.day) + 1
+    def self.days(duration = RailsPerformance.duration)
+      (duration / 1.day) + 1
     end
 
     def self.median(array)

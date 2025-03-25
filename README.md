@@ -14,10 +14,17 @@ A new version with P50, P90, P99, throughput, and more is available.
 
 ![Home](docs/rails_performance_updated_home.png)
 
+Detailed p50, p90, p99 response time information.
+
+![Home](docs/rails_performance_recent_requests.png)
+
+(more screenshots below)
+
 It allows you to track:
 
 - real-time monitoring on the Recent tab
 - see your p50, p90, p99 response time
+- monitor system resources (CPU, memory, disk)
 - monitor slow requests
 - throughput report (see amount of RPM (requests per minute))
 - an average response time
@@ -112,8 +119,20 @@ RailsPerformance.setup do |config|
 
   # To monitor custom events with `RailsPerformance.measure` block
   # config.include_custom_events = true
+
+  # To monitor system resources (CPU, memory, disk)
+  # to enabled add required gems (see README)
+  # config.system_monitor_duration = 24.hours
 end if defined?(RailsPerformance)
 ```
+
+Additionally you might need to configure app time zone. You can do it in `config/application.rb`:
+
+```ruby
+config.time_zone = 'Eastern Time (US & Canada)'
+```
+
+Gem will present charts/tables in the app timezone. If it's not set, it will use UTC.
 
 ## Installation
 
@@ -170,6 +189,51 @@ You need to configure `config.custom_data_proc`. And you can capture current_use
 ![Custom Data](docs/custom_data.png)
 
 
+### Server Monitoring
+
+![Server Monitoring](docs/rails_performance_cpu_memory_storage.png)
+
+You can monitor system resources (CPU, memory, disk) by adding a gem to your Gemfile:
+
+```ruby
+gem "sys-filesystem"
+gem "sys-cpu"
+gem "get_process_mem"
+```
+
+Once you add these gems, it will track and show you the system resources on the dashboard.
+
+If you have multiple servers running the same app, it will use store metrics per server. You can configure the the env variable ENV["RAILS_PERFORMANCE_SERVER_ID"] or using `hostname` command.
+
+Basically using this code:
+
+```ruby
+      def server_id
+        @server_id ||= ENV["RAILS_PERFORMANCE_SERVER_ID"] || `hostname`.strip
+      end
+```
+
+For Kamal for example:
+
+```yaml
+env:
+  clear:
+    RAILS_PERFORMANCE_SERVER_ID: "server"
+```
+
+You can also specifify custom "context" and "role" for monitoring, by changing the env variables:
+
+```ruby
+RailsPerformance::Extensions::ResourceMonitor.new(
+  ENV["RAILS_PERFORMANCE_SERVER_CONTEXT"].presence || "rails",
+  ENV["RAILS_PERFORMANCE_SERVER_ROLE"].presence || "web"
+)
+```
+
+More information here: `lib/rails_performance/engine.rb`.
+
+PS: right now it can only distinguish between web app servers and the sidekiq servers.
+
 ### Custom events
 
 ```ruby
@@ -178,7 +242,9 @@ RailsPerformance.measure("some label", "some namespace") do
 end
 ```
 
-## Using with Rails Namespace
+## Using with Redis Namespace
+
+If you want to use Redis namespace (for example when you have multiple apps running on the same server), you can configure it like this:
 
 ```ruby
   config.redis = Redis::Namespace.new("#{Rails.env}-rails-performance", redis: Redis.new(url: ENV["REDIS_URL"].presence || "redis://127.0.0.1:6379/0"))
@@ -218,6 +284,8 @@ After this:
 - rails s
 - rake test
 
+If you need quickly clear Redis data, you can use `rails runner 'RailsPerformance.redis.flushdb'`.
+
 Like a regular web development.
 
 Please note that to simplify integration with other apps all CSS/JS are bundled inside, and delivered in body of the request. This is to avoid integration with assets pipeline or webpacker.
@@ -252,6 +320,7 @@ The idea of this gem grew from curiosity how many RPM my app receiving per day. 
 - searchkiq
 - sinatra?
 - tests to check what is actually stored in redis db after request
+- upgrade bulma
 
 ## Contributing
 

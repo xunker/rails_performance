@@ -1,176 +1,124 @@
-function showTIRChart(div, data, addon, name) {
-  Highcharts.chart(div, {
-      // time: {
-      //   timezone: 'Europe/Kiev'
-      // },
+function showChart(element_id, type, title, options) {
+  const chart = new ApexCharts(
+    document.getElementById(element_id),
+    {
+      ...options,
       chart: {
-          type: 'area',
-          zoomType: 'x',
+        type: type,
+        height: 300,
+        zoom: {
+          type: 'x',
+        },
       },
-      title: {
-          text: ''
+      colors: ['#ff5b5b'],
+      stroke: {
+        width: 1,
       },
-      tooltip: {
-          borderWidth: 0,
-          backgroundColor: 'yellow',
-          pointFormat: '{point.y}',
-          //headerFormat: '',
-          shadow: false,
-          style: {
-              fontSize: '16px',
-              color: '#000',
-          },
-          formatter: function() {
-              if (this.y == 0) {
-                return false; 
-              }
-            return this.y + addon;
-          }
-      },
-      xAxis: {
-          crosshair: true,
-          type: 'datetime',
-          labels: {
-            style: {
-              color: "#a6b0cf"
-            }
-          }
-      },
-      yAxis: {
-          min: 0,
-          title: {
-              text: 'RPM',
-              style: {
-                color: "#f6f6f6"
-              }
-          },
-          labels: {
-            style: {
-              color: "#a6b0cf"
-            }
-          }
+      dataLabels: {
+        enabled: false
       },
       legend: {
-          enabled: false
+        show: false
       },
-      exporting: {
-        buttons: {
-          contextButton: {
-            theme: {
-              fill: "#eee"
-            }
+      xaxis: {
+        crosshairs: {
+          show: true
+        },
+        type: 'datetime',
+        labels: {
+          datetimeUTC: false,
+          style: {
+            colors: ["#a6b0cf"]
           }
         }
       },
-      plotOptions: {
-          area: {
-            color: '#ff5b5b',
-          }
-      },
-      series: [{
-          type: 'area',
-          name: name,
-          data: data,
-          fillOpacity: 0.3,
-          lineWidth: 1,
-          states: {
-            hover: {
-              lineWidth: 1
-            }
-          }
-      }]
-  });
-};
-
-function showRTChart(div, data) {
-  Highcharts.chart(div, {
-      // time: {
-      //   timezone: 'Europe/Kiev'
-      // },
-      chart: {
-          type: 'area',
-          zoomType: 'x',
-      },
-      title: {
-          text: ''
-      },
-
-      tooltip: {
-          borderWidth: 0,
-          backgroundColor: 'yellow',
-          pointFormat: '{point.y}',
-          //headerFormat: '',
-          shadow: false,
+      yaxis: {
+        min: 0,
+        title: {
+          text: title,
           style: {
-              fontSize: '16px',
-              color: '#000',
-          },
-          formatter: function() {
-              if (this.y == 0) {
-                return false;
-              }
-              return this.y + ' ms';
+            color: "#f6f6f6"
           }
-      },
-      xAxis: {
-          crosshair: false,
-          type: 'datetime',
-          labels: {
-            style: {
-              color: "#a6b0cf"
-            }
-          }
-      },
-      yAxis: {
-          min: 0,
-          title: {
-              text: 'Time',
-              style: {
-                color: "#f6f6f6"
-              }
-          },
-          labels: {
-            style: {
-              color: "#a6b0cf"
-            }
-          }
-      },
-      legend: {
-          enabled: false
-      },
-      exporting: {
-        buttons: {
-          contextButton: {
-            theme: {
-              fill: "#eee"
-            }
+        },
+        labels: {
+          style: {
+            colors: ["#a6b0cf"]
           }
         }
-      },
-      plotOptions: {
-          area: {
-            color: '#ff5b5b',
-          }
-      },
-      series: [{
-          type: 'area',
-          name: 'Response Time',
-          data: data,
-          fillOpacity: 0.3,
-          lineWidth: 1,
-          states: {
-            hover: {
-              lineWidth: 1
-            }
-          }
-      }]
+      }
+    }
+  );
+  chart.render();
+}
+
+function tooltipOptions(formatter) {
+  return {
+    style: {
+      fontSize: '16px'
+    },
+    marker: {
+      show: false,
+    },
+    x: {
+      show: false,
+      format: 'dd/MM/yy HH:mm'
+    },
+    y: {
+      formatter: formatter,
+      title: {
+        formatter: () => '',
+      }
+    }
+  };
+}
+
+function showTIRChart(element_id, data, addon, name) {
+  showChart(element_id, 'area', 'RPM', {
+    tooltip: tooltipOptions(value => (value ? value + addon : undefined)),
+    series: [{
+      name: name,
+      data: data
+    }]
   });
-};
+}
 
-const recent = document.getElementById("recent")
-const autoupdate = document.getElementById("autoupdate")
+function showRTChart(element_id, data) {
+  showChart(element_id, 'area', 'Time', {
+    tooltip: tooltipOptions(value => (value ? value + ' ms' : undefined)),
+    series: [{
+      name: 'Response Time',
+      data: data,
+    }],
+  });
+}
 
-if(autoupdate) {
+function showPercentageChart(element_id, data, name) {
+  showChart(element_id, 'line', '%', {
+    tooltip: tooltipOptions(value => (value ? value + ' %' : undefined)),
+    series: [{
+      name: name,
+      data: data,
+    }]
+  });
+}
+
+function showUsageChart(element_id, data, name, pow) {
+  const units = ['bytes', 'KB', 'MB', 'GB', 'TB', 'PB'][pow];
+  const bytes = Math.pow(1024, pow);
+
+  showChart(element_id, 'line', name, {
+    tooltip: tooltipOptions(value => (value ? `${value} ${units}` : undefined)),
+    series: [{
+      name: name,
+      data: data.map(([timestamp, value]) => [timestamp, typeof value === 'number' ? (value / bytes).toFixed(2) : null]),
+    }]
+  });
+}
+
+const recent = document.getElementById("recent");
+const autoupdate = document.getElementById("autoupdate");
+
+if (autoupdate) {
   // set autoupdate checked from localStorage is missing
   if (localStorage.getItem("autoupdate") === null) {
     localStorage.setItem("autoupdate", "true");
@@ -181,12 +129,12 @@ if(autoupdate) {
   });
 }
 
-if(recent) {
-  const tbody = recent.querySelector("tbody")
+if (recent) {
+  const tbody = recent.querySelector("tbody");
 
   setInterval(() => {
-    tr = tbody.children[0];
-    from_timei = tr.getAttribute("from_timei") || ''
+    const tr = tbody.children[0];
+    const from_timei = tr.getAttribute("from_timei") || '';
 
     if (!autoupdate.checked) {
       return;
@@ -200,6 +148,6 @@ if(recent) {
       .then(res => res.text())
       .then(html => {
         tbody.innerHTML = html + tbody.innerHTML;
-    })
+      });
   }, 3000);
 }
