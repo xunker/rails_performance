@@ -19,12 +19,43 @@ module RailsPerformance
       now.strftime("%H:%M")
     end
 
-    def self.fetch_from_redis(query)
+    # Fetch keys and values from Redis. For information on the :count argument,
+    # see documentation for the Redis `scan` command:
+    #   https://redis.io/docs/latest/commands/scan/#the-count-option
+    #
+    # @param [String] query Redis key or pattern to query
+    # @param [Integer] scan_batch_size The "count" option for Redis `scan`
+    #                                  command, default: 10
+    # @param [<Integer] mget_batch_size Number of keys sent to Redis `mget`
+    #                                   command at one time, default: 1000
+    #
+    # @return [Array, Array] [<Array of keys found, Array of key values]
+    def self.fetch_from_redis(query, scan_batch_size: 10, mget_batch_size: 1000)
       RailsPerformance.log "\n\n   [REDIS QUERY]   -->   #{query}\n\n"
 
-      keys = RailsPerformance.redis.keys(query)
+      keys = []
+      current_cursor = nil
+      until current_cursor.present? && current_cursor.zero?
+        current_cursor ||= 0
+
+        RailsPerformance.log "\n\n   [CURSOR]   -->   #{current_cursor}\n\n"
+
+        current_cursor, key_batch = RailsPerformance.redis.scan(
+          current_cursor,
+          match: query,
+          count: scan_batch_size,
+          type: :string # only return String objects from Redis
+        )
+        keys += key_batch
+
+        current_cursor = current_cursor.to_i
+      end
+
       return [] if keys.blank?
-      values = RailsPerformance.redis.mget(keys)
+
+      values = keys.in_groups_of(mget_batch_size).map do |key_batch|
+        RailsPerformance.redis.mget(key_batch.compact)
+      end.flatten
 
       RailsPerformance.log "\n\n   [FOUND]   -->   #{values.size}\n\n"
 
